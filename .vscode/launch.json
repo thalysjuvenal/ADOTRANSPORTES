@@ -20,5 +20,6 @@
 			"label": "SIGAADV"
 		}
 	],
-	"lastProgramExecuted": "SIGAADV"
+	"lastProgramExecuted": "SIGAADV",
+	"lastProgramArguments": []
 }

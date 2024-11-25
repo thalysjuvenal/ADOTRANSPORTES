@@ -1,0 +1,10 @@
+E2_NUM    :=  cData              
+E2_TIPO   :=  "NF"               
+E2_NATUREZ:=  "PAGFOR"           
+E2_FORNECE:=  cFornec            
+E2_LOJA   :=  cForLoja           
+E2_EMISSAO:=  Stod(cData)        
+E2_VENCTO :=  Stod(cData)        
+E2_VENCREA:=  Stod(cData)        
+E2_HIST   :=  "Pagamento VIA PIX"
+E2_VALOR  :=  nValor             

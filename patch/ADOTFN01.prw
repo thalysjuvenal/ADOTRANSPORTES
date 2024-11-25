@@ -70,7 +70,6 @@ Static Function fImporta(cArqSel)
 	Local aLogErro         := {}
 	Local nLinhaErro       := 0
 	Local lIncOk           := .F.
-	Local lPixOK           := .F.
 	//Variáveis do ExecAuto
 	Private cAlias         := GetNextAlias()
 	Private cAliasSA2      := GetNextAlias()
@@ -111,7 +110,6 @@ Static Function fImporta(cArqSel)
 			oArquivo:Open()
 
 			//Caso você queira, usar controle de transação, descomente a linha abaixo (e a do End Transaction), mas tem algumas rotinas que podem ser impactadas via ExecAuto
-			//Begin Transaction
 
 			//Enquanto tiver linhas
 			While (oArquivo:HasLine())
@@ -147,19 +145,53 @@ Static Function fImporta(cArqSel)
 					cDataEmi := AvKey(aLinha[8], 'E2_EMISSAO' )
 
 					//Utiliza HTTPGET para retornar os dados da Receita Federal
-					cJson := HttpGet('https://viacep.com.br/ws/'+ cCep + '/json/', cGetParms, nTimeOut, aHeadStr, @cHeaderGet)
-					cJson := DecodeUTF8(cJson)
-					cJson := FWNoAccent(cJson)
+					//cJson := HttpGet('https://viacep.com.br/ws/'+ cCep + '/json/', cGetParms, nTimeOut, aHeadStr, @cHeaderGet)
+					//cJson := DecodeUTF8(cJson)
+					//cJson := NoAcento(cJson)
 
-					//Transformando a string JSON em Objeto
-					If FWJsonDeserialize(cJson,@oObjJson)
-						cEnder  := oObjJson:logradouro
-						cBairro := oObjJson:Bairro
-						cMuni   := oObjJson:localidade
-						cEstado := oObjJson:uf
-						cCodMun := Substr(oObjJson:ibge,3)
+					// Verifica se o JSON contém erro antes de tentar deserializar
+					//If "erro" $ cJson .And. FWJsonDeserialize(cJson, @oObjJson)
+					//	// Tratamento quando a API retorna erro
+					//	If oObjJson:erro == "true"
+					//		// Define valores padrão para as variáveis
+					//		cEnder  := ""
+					//		cBairro := ""
+					//		cMuni   := ""
+					//		cEstado := ""
+					//		cCodMun := ""
+					//		// Log do erro (opcional)
+					//		//cLog += '- CEP ' + cCep + ' não encontrado na API ViaCEP.' + CRLF
+					//	Else
+					//		// Caso não haja erro, preenche as variáveis com os dados retornados
+					//		cEnder  := oObjJson:logradouro
+					//		cBairro := oObjJson:Bairro
+					//		cMuni   := oObjJson:localidade
+					//		cEstado := oObjJson:uf
+					//		cCodMun := Substr(oObjJson:ibge,3)
+					//	EndIf
+					//Else
+					//	// Caso o JSON não contenha erro e seja válido
+					//	If FWJsonDeserialize(cJson, @oObjJson)
+					//		cEnder  := oObjJson:logradouro
+					//		cBairro := oObjJson:Bairro
+					//		cMuni   := oObjJson:localidade
+					//		cEstado := oObjJson:uf
+					//		cCodMun := Substr(oObjJson:ibge,3)
+					//	Else
+					//		// Se a deserialização falhar, defina valores padrão e log de erro
+					//		cEnder  := ""
+					//		cBairro := ""
+					//		cMuni   := ""
+					//		cEstado := ""
+					//		cCodMun := ""
+					//		//cLog += '- Erro ao processar JSON da API ViaCEP para o CEP ' + cCep + '.' + CRLF
+					//	EndIf
+					//EndIf
+
+
+					If Select(cAlias) <> 0
+						(cAlias)->(DbCloseArea())
 					EndIf
-
 					//Pegando o último código do fornecedor conforme a query
 					BeginSql Alias cAlias
 						%noparser%
@@ -177,6 +209,9 @@ Static Function fImporta(cArqSel)
 					cFornec := AvKey((cAlias)->A2_COD, 'A2_COD')
 					cFornec := Soma1(cFornec)
 
+					If Select(cAliasSA2) <> 0
+						(cAliasSA2)->(DbCloseArea())
+					EndIf
 					//Verificando se o fornecedor existe
 					BeginSql Alias cAliasSA2
 						%noparser%
@@ -193,77 +228,43 @@ Static Function fImporta(cArqSel)
 
 					(cAliasSA2)->(dbGoTop())
 
-					If (cAliasSA2)->A2_COD == ''
+					If (cAliasSA2)->(Eof())
 
-						aDados := {}
-						aadd(aDados, {'A2_COD'    , cFornec           , Nil})
-						aadd(aDados, {'A2_LOJA'   , cForLoja          , Nil})
-						aadd(aDados, {'A2_CGC'    , cCGC              , Nil})
-						aadd(aDados, {'A2_NOME'   , Substr(cNome,1,60), Nil})
-						aadd(aDados, {'A2_NREDUZ' , Substr(cNome,1,14), Nil})
-						aadd(aDados, {'A2_END'    , cEnder            , Nil})
-						aadd(aDados, {'A2_EST'    , cEstado           , Nil})
-						aadd(aDados, {'A2_COD_MUN', cCodMun           , Nil})
-						aadd(aDados, {'A2_MUN'    , cMuni             , Nil})
-						aadd(aDados, {'A2_NATUREZ', "PAGFOR"          , Nil})
-						aadd(aDados, {'A2_PAIS'   , "105"             , Nil})
-						aadd(aDados, {'A2_CODPAIS', "01058"           , Nil})
-						aadd(aDados, {'A2_TPESSOA', "OS"              , Nil})
-						aadd(aDados, {'A2_TIPO'   , cTipo             , Nil})
+						RecLock("SA2", .T.)
+						SA2->A2_FILIAL  := xFilial("SA2")
+						SA2->A2_COD     := cFornec
+						SA2->A2_LOJA    := cForLoja
+						SA2->A2_CGC     := cCGC
+						SA2->A2_NOME    := Substr(cNome,1,60)
+						SA2->A2_NREDUZ  := Substr(cNome,1,14)
+						SA2->A2_END     := 'NENHUM'
+						SA2->A2_EST     := 'SP'
+						//SA2->A2_EST     := cEstado
+						SA2->A2_COD_MUN := '00000'
+						//SA2->A2_COD_MUN := cCodMun
+						SA2->A2_MUN     := 'NA'
+						//SA2->A2_MUN     := cMuni
+						SA2->A2_NATUREZ := "PAGFOR"
+						SA2->A2_PAIS    := "105"
+						SA2->A2_CODPAIS := "01058"
+						SA2->A2_TPESSOA := "OS"
+						SA2->A2_TIPO    := cTipo
+						SA2->(MsUnlock())
+						lIncOk := .T.
 
-						lMsErroAuto := .F.
-						oModel := FWLoadModel('MATA020')
-						FWMVCRotAuto( ;
-							oModel,; //Modelo
-							cAliasImp,; //Alias
-							MODEL_OPERATION_INSERT,; //Operacao
-							{{cIDAlias, aDados}}; //Dados
-							)
+					Else
+						cFornec := (cAliasSA2)->A2_COD
+						cForLoja := (cAliasSA2)->A2_LOJA
+						lIncOk := .T.
+					EndIf
 
-						//Se houve erro, gera o log
-						If lMsErroAuto
-							cPastaErro := '\x_logs\'
-							cNomeErro  := 'erro_' + cAliasImp + '_lin_' + cValToChar(nLinhaAtu) + '_' + dToS(Date()) + '_' + StrTran(Time(), ':', '-') + '.txt'
-
-							//Se a pasta de erro não existir, cria ela
-							If ! ExistDir(cPastaErro)
-								MakeDir(cPastaErro)
-							EndIf
-
-							//Pegando log do ExecAuto, percorrendo e incrementando o texto
-							aLogErro := GetAutoGRLog()
-							cTextoErro := ''
-							For nLinhaErro := 1 To Len(aLogErro)
-								cTextoErro += aLogErro[nLinhaErro] + CRLF
-							Next
-
-							//Criando o arquivo txt e incrementa o log
-							MemoWrite(cPastaErro + cNomeErro, cTextoErro)
-							cLog += '- Falha ao incluir registro, linha [' + cValToChar(nLinhaAtu) + '], arquivo de log em ' + cPastaErro + cNomeErro + CRLF
-						Else
-							cLog += '+ Sucesso no Execauto na linha ' + cValToChar(nLinhaAtu) + ';' + CRLF
-							lIncOk := .T.
-						EndIf
-
-						oModel:DeActivate()
-
-						If lIncOk
-
-							lPixOK := U_F885MVC(cFornec, cForLoja, cTipPIX, cChavPix)
-
-							if lPixOK
-								cLog += '+ Sucesso na Inclusão da Chave PIX ' + cValToChar(nLinhaAtu) + ';' + CRLF
-							else
-								cLog += '+ Falha na Inclusão da Chave PIX ' + cValToChar(nLinhaAtu) + ';' + CRLF
-							Endif
-						EndIf
-
-					Endif
+					If lIncOk
+						U_F885MVC(cFornec,cForLoja, cTipPIX, cChavPix, cDataEmi, nValor, cNome)
+					EndIf
 
 				EndIf
 
 			EndDo
-			//End Transaction
 
 			//Se tiver log, mostra ele
 			If ! Empty(cLog)
@@ -281,8 +282,7 @@ Static Function fImporta(cArqSel)
 		FWAlertError('Arquivo não pode ser aberto!', 'Atenção')
 	EndIf
 
-	cAliasImp->(DbCloseArea())
-	cAlias->(DbCloseArea())
+	//SA2->(DbCloseArea())
 
 Return
 
@@ -298,41 +298,136 @@ Return
 	@table   Tabelas
 	@since   08-11-2024
 /*/
-User Function F885MVC(cFornec As Character, cForLoja As Character, cTipoCHV As Character, cCodChvPIX As Character)
+User Function F885MVC(cFornec As Character, cForLoja As Character, cTipoCHV As Character, cCodChvPIX As Character, cData as Character, nValor, cNome)
 
-	Local oModel   := Nil
-	Local lOk      := .F.
-	Local aAreaF72 := GetArea()
+	//Local oModel      := Nil
+	Local lOk := .F.
+	Local aAreaF72    := GetArea()
+	Local cAliasF72 := GetNextAlias()()
 
-	DbSelectArea("SA2")
-	SA2->(DbSetOrder(1))
-	If SA2->(DBSeek(xFilial("SA2") + cFornec + cForLoja))
-		oModel := FwLoadModel ("FINA885")
-		oModel:SetOperation(MODEL_OPERATION_INSERT)
-		oModel:Activate()
+	If Select(cAliasF72) <> 0
+		(cAliasF72)->(DbCloseArea())
+	EndIf
 
-		oModel:SetValue("FORMCAB","F72_FILIAL", xFilial("SA2"))
-		oModel:SetValue("FORMCAB","F72_COD" , cFornec)
-		oModel:SetValue("FORMCAB","F72_LOJA" , cForLoja)
-		oModel:SetValue("FORMCAB","F72_NOME" , SA2->A2_NOME)
+	BeginSql alias cAliasF72
+		%noparser%
 
-		oModel:SetValue("FORDETAIL", "F72_TPCHV" , cTipoCHV)
-		oModel:SetValue("FORDETAIL", "F72_CHVPIX", cCodChvPIX)
-		oModel:SetValue("FORDETAIL", "F72_ACTIVE", "1")
+		SELECT
+			F72_COD
+		FROM
+			%table:F72% F72 WITH (NOLOCK)
+		WHERE
+			F72_COD = %exp:cFornec%
+			AND F72_LOJA = %exp:cForLoja%
+			AND F72.D_E_L_E_T_ <> '*'
+	EndSql
 
-		If oModel:VldData()
-			oModel:CommitData()
-			lOk    := .T.
-		Else
-			VarInfo("",oModel:GetErrorMessage())
-		EndIf
+	If (cAliasF72)->(EOF())
 
-		oModel:DeActivate()
-		oModel:Destroy()
-		oModel := NIL
-	EndiF
+		RecLock('F72', .T.)
+
+		F72_FILIAL := xFilial("F72")
+		F72_COD := cFornec
+		F72_LOJA := cForLoja
+		F72_TPCHV := cTipoCHV
+		F72_CHVPIX := cCodChvPIX
+		F72_ACTIVE := '1'
+		F72->(MsUnlock())
+
+		lOk := .T.
+
+	Else
+
+		lOk := .T.
+	EndIf
+	(cAliasF72)->(DbCloseArea())
+
+	if lOk
+		U_FIN050(cFornec, cForLoja, cData, nValor, cNome)
+	Endif
 
 	SA2->(DbCloseArea())
+	F72->(DbCloseArea())
 	RestArea(aAreaF72)
 
-Return lOk
+Return Nil
+
+/*/{Protheus.doc} FIN050
+
+	Inclui o titulo no contas a pagar
+
+	@author      Thalys Augusto
+	@example Exemplos
+	@param   [Nome_do_Parametro],Tipo_do_Parametro,Descricao_do_Parametro
+	@return  Especifica_o_retorno
+	@table   Tabelas
+	@since   08-11-2024
+/*/
+User Function FIN050(cFornec, cForLoja, cData, nValor, cNome)
+
+	Local aArray := {}
+	Local cFunName := ""
+	Local cParcela := ""
+	Local cPrefSE2 := "PIX"
+	Local cAliasSE2 := GetNextAlias()
+	PRIVATE lMsErroAuto := .F.
+
+	cParcela := AvKey(cParcela, 'E2_PARCELA' )
+	cPrefSE2 := AvKey(cPrefSE2, 'E2_PREFIXO' )
+
+	If Select(cAliasSE2) <> 0
+		(cAliasSE2)->(DbCloseArea())
+	EndIf
+
+	BeginSql Alias cAliasSE2
+		%noparser%
+
+		Select
+			E2_NUM
+		from
+			%table:SE2% SE2 WITH (NOLOCK)
+		Where
+			E2_NUM = %exp:cData%
+			AND E2_TIPO = 'NF'
+			AND E2_NATUREZ = 'PAGFOR'
+			AND E2_FORNECE = %exp:cFornec%
+			AND E2_LOJA = %exp:cForLoja%
+			AND E2_PREFIXO = 'PIX'
+			AND E2_EMISSAO = %exp:cData%
+			and SE2.D_E_L_E_T_ <> '*'
+	EndSql
+
+	cNumero := Alltrim((cAliasSE2)->E2_NUM)
+
+	If cNumero == ""
+
+		DbSelectArea("SE2")
+		SE2->(DbSetOrder(1))//E2_FILIAL + E2_PREFIXO + E2_NUM + E2_PARCELA + E2_TIPO + E2_FORNECE + E2_LOJA
+
+		RecLock('SE2',.T.)
+		SE2->E2_FILIAL  := xFilial("SE2")
+		SE2->E2_PREFIXO := "PIX"
+		SE2->E2_NUM     := cData
+		SE2->E2_TIPO    := "NF"
+		SE2->E2_NATUREZ := "PAGFOR"
+		SE2->E2_FORNECE := cFornec
+		SE2->E2_LOJA    := cForLoja
+		SE2->E2_NOMFOR := Substr(cNome,1,60)
+		SE2->E2_EMISSAO := Stod(cData)
+		SE2->E2_VENCTO  := Stod(cData)
+		SE2->E2_VENCREA := Stod(cData)
+		SE2->E2_HIST    := "Pagamento VIA PIX"
+		SE2->E2_MOEDA   := 1
+		SE2->E2_VALOR   := nValor
+		SE2->E2_SALDO   := nValor
+		SE2->E2_VLCRUZ   := nValor
+		SE2->E2_ORIGEM := "ADOTFN01"
+		SE2->(MsUnlock())
+
+		Conout("incluido titulo")
+
+	EndIf
+
+	SE2->(DbCloseArea())
+
+Return Nil
