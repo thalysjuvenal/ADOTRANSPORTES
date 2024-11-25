@@ -143,9 +143,9 @@ Static Function fImporta(cArqSel)
 					cCep     := AvKey(aLinha[4], 'A2_CEP' )
 					cTipo    := AvKey(aLinha[5], 'A2_TIPO' )
 					cTipPIX  := AvKey(aLinha[6], 'F72_TPCHV' )
+					cTipPIX  := '0' + Alltrim(cTipPIX)
 					cChavPix := AvKey(aLinha[7], 'F72_CHVPIX' )
-					cDataEmi := AvKey(aLinha[8], 'E2_EMISSAO' )
-
+					
 					//Utiliza HTTPGET para retornar os dados da Receita Federal
 					cJson := HttpGet('https://viacep.com.br/ws/'+ cCep + '/json/', cGetParms, nTimeOut, aHeadStr, @cHeaderGet)
 					cJson := DecodeUTF8(cJson)
@@ -252,9 +252,9 @@ Static Function fImporta(cArqSel)
 							lPixOK := U_F885MVC(cFornec, cForLoja, cTipPIX, cChavPix)
 
 							if lPixOK
-								cLog += '+ Sucesso na Inclusão da Chave PIX ' + cValToChar(nLinhaAtu) + ';' + CRLF
+								cLog += '+ Sucesso na Inclusão da Chave PIX: ' + cValToChar(nLinhaAtu) + ';' + CRLF
 							else
-								cLog += '+ Falha na Inclusão da Chave PIX ' + cValToChar(nLinhaAtu) + ';' + CRLF
+								cLog += '+ Falha na Inclusão da Chave PIX: ' + cValToChar(nLinhaAtu) + ';' + CRLF
 							Endif
 						EndIf
 
