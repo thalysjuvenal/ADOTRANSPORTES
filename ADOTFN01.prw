@@ -3,7 +3,9 @@
 #Include "FWMVCDEF.ch"
 
 /*/{Protheus.doc} ADOTFN01
-Importador Contas a Pagar
+
+Importador de Fornecedores
+
 @author Thalys Augusto
 @since 08/11/2024
 @version 1.0
@@ -139,26 +141,22 @@ Static Function fImporta(cArqSel)
 					//Transformando os campos caractere, adicionando espaços a direita conforme tamanho do campo no dicionário
 					cCGC     := AvKey(aLinha[1], 'A2_CGC' )
 					cNome    := AvKey(aLinha[2], 'A2_NOME' )
+					cNome    := FWNoAccent(cNome)
 					nValor   := aLinha[3]
-					cCep     := AvKey(aLinha[4], 'A2_CEP' )
+					// Remove o traço do CEP, caso exista
+					cCep     := StrTran(aLinha[4], "-", "")
+					cCep     := AvKey(cCep, 'A2_CEP' )
 					cTipo    := AvKey(aLinha[5], 'A2_TIPO' )
 					cTipPIX  := AvKey(aLinha[6], 'F72_TPCHV' )
 					cTipPIX  := '0' + Alltrim(cTipPIX)
 					cChavPix := AvKey(aLinha[7], 'F72_CHVPIX' )
-					
-					//Utiliza HTTPGET para retornar os dados da Receita Federal
-					cJson := HttpGet('https://viacep.com.br/ws/'+ cCep + '/json/', cGetParms, nTimeOut, aHeadStr, @cHeaderGet)
-					cJson := DecodeUTF8(cJson)
-					cJson := FWNoAccent(cJson)
 
-					//Transformando a string JSON em Objeto
-					If FWJsonDeserialize(cJson,@oObjJson)
-						cEnder  := oObjJson:logradouro
-						cBairro := oObjJson:Bairro
-						cMuni   := oObjJson:localidade
-						cEstado := oObjJson:uf
-						cCodMun := Substr(oObjJson:ibge,3)
-					EndIf
+					// Inicializa valores padrão
+					cEnder  := "RUA X"
+					cBairro := "X"
+					cMuni   := "SANTO ANDRE"
+					cEstado := "SP"
+					cCodMun := "47809"	
 
 					//Pegando o último código do fornecedor conforme a query
 					BeginSql Alias cAlias
@@ -193,7 +191,7 @@ Static Function fImporta(cArqSel)
 
 					(cAliasSA2)->(dbGoTop())
 
-					If (cAliasSA2)->A2_COD == ''
+					If (cAliasSA2)->A2_COD == "      "
 
 						aDados := {}
 						aadd(aDados, {'A2_COD'    , cFornec           , Nil})
@@ -249,7 +247,7 @@ Static Function fImporta(cArqSel)
 
 						If lIncOk
 
-							lPixOK := U_F885MVC(cFornec, cForLoja, cTipPIX, cChavPix)
+							lPixOK := U_F885MVC(cFornec, cForLoja, cTipPIX, cChavPix, cNome)
 
 							if lPixOK
 								cLog += '+ Sucesso na Inclusão da Chave PIX: ' + cValToChar(nLinhaAtu) + ';' + CRLF
@@ -259,8 +257,10 @@ Static Function fImporta(cArqSel)
 						EndIf
 
 					Endif
-
+					(cAliasSA2)->(DbCloseArea())
 				EndIf
+
+				(cAlias)->(DbCloseArea())
 
 			EndDo
 			//End Transaction
@@ -281,8 +281,7 @@ Static Function fImporta(cArqSel)
 		FWAlertError('Arquivo não pode ser aberto!', 'Atenção')
 	EndIf
 
-	cAliasImp->(DbCloseArea())
-	cAlias->(DbCloseArea())
+	(SA2)->(DbCloseArea())
 
 Return
 
@@ -298,7 +297,7 @@ Return
 	@table   Tabelas
 	@since   08-11-2024
 /*/
-User Function F885MVC(cFornec As Character, cForLoja As Character, cTipoCHV As Character, cCodChvPIX As Character)
+User Function F885MVC(cFornec As Character, cForLoja As Character, cTipoCHV As Character, cCodChvPIX As Character, cNomeFor as Character)
 
 	Local oModel   := Nil
 	Local lOk      := .F.
@@ -314,7 +313,7 @@ User Function F885MVC(cFornec As Character, cForLoja As Character, cTipoCHV As C
 		oModel:SetValue("FORMCAB","F72_FILIAL", xFilial("SA2"))
 		oModel:SetValue("FORMCAB","F72_COD" , cFornec)
 		oModel:SetValue("FORMCAB","F72_LOJA" , cForLoja)
-		oModel:SetValue("FORMCAB","F72_NOME" , SA2->A2_NOME)
+		oModel:SetValue("FORMCAB","F72_NOME" , cNomeFor)
 
 		oModel:SetValue("FORDETAIL", "F72_TPCHV" , cTipoCHV)
 		oModel:SetValue("FORDETAIL", "F72_CHVPIX", cCodChvPIX)
