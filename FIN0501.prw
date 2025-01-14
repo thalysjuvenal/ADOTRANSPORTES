@@ -23,12 +23,12 @@ User Function FIN0501()
 		//Chama a função para buscar arquivos
 		cArqSel := tFileDialog(;
 			cTipArq,;  // Filtragem de tipos de arquivos que serão selecionados
-		cTitulo,;  // Título da Janela para seleção dos arquivos
-		,;         // Compatibilidade
-		cDirIni,;  // Diretório inicial da busca de arquivos
-		lSalvar,;  // Se for .T., será uma Save Dialog, senão será Open Dialog
-		;          // Se não passar parâmetro, irá pegar apenas 1 arquivo; Se for informado GETF_MULTISELECT será possível pegar mais de 1 arquivo; Se for informado GETF_RETDIRECTORY será possível selecionar o diretório
-		)
+			cTitulo,;  // Título da Janela para seleção dos arquivos
+			,;         // Compatibilidade
+			cDirIni,;  // Diretório inicial da busca de arquivos
+			lSalvar,;  // Se for .T., será uma Save Dialog, senão será Open Dialog
+			;          // Se não passar parâmetro, irá pegar apenas 1 arquivo; Se for informado GETF_MULTISELECT será possível pegar mais de 1 arquivo; Se for informado GETF_RETDIRECTORY será possível selecionar o diretório
+			)
 
 		//Se tiver o arquivo selecionado e ele existir
 		If ! Empty(cArqSel) .And. File(cArqSel)
@@ -55,7 +55,7 @@ Static Function fImporta(cArqSel)
 	Local aLinha           := {}
 	Local oArquivo
 	Local cLog             := ''
-	Local lIgnor01         := FWAlertYesNo( 'Deseja ignorar a linha 1 do arquivo?' , 'Ignorar?' )
+	//Local lIgnor01         := FWAlertYesNo( 'Deseja ignorar a linha 1 do arquivo?' , 'Ignorar?' )
 	Local cPastaErro       := '\x_logs\'
 	Local cNomeErro        := ''
 	Local cTipoOper        := ""
@@ -116,12 +116,8 @@ Static Function fImporta(cArqSel)
 				cLinAtu := oArquivo:GetLine()
 				aLinha  := Separa(cLinAtu, cSeparador)
 
-				//Se estiver configurado para pular a linha 1, e for a linha 1
-				If lIgnor01 .And. nLinhaAtu == 1
-					Loop
-
-					//Se houver posições no array
-				ElseIf Len(aLinha) > 0
+				//Se houver posições no array
+				If Len(aLinha) > 0
 
 					//Transformando de caractere para numérico (exemplo '1.234,56' para 1234.56)
 					aLinha[3] := StrTran(aLinha[3], '.' , '' )
@@ -136,16 +132,16 @@ Static Function fImporta(cArqSel)
 
 					//Verificando se o fornecedor existe
 					BeginSql Alias cAliasSA2
-                        %noparser%
+						%noparser%
 
-                        SELECT
-                            A2_COD,
-                            A2_LOJA
-                        FROM
-                            %table:SA2% SA2 WITH (NOLOCK)
-                        WHERE
-                            A2_CGC = %exp:cCGC%
-                            AND SA2.D_E_L_E_T_ <> '*'
+						SELECT
+							A2_COD,
+							A2_LOJA
+						FROM
+							%table:SA2% SA2 WITH (NOLOCK)
+						WHERE
+							A2_CGC = %exp:cCGC%
+							AND SA2.D_E_L_E_T_ <> '*'
 					EndSql
 
 					(cAliasSA2)->(dbGoTop())
@@ -154,7 +150,11 @@ Static Function fImporta(cArqSel)
 					cForLoja := AvKey((cAliasSA2)->A2_LOJA, 'A2_LOJA' )
 					cNomFor  := AvKey(aLinha[2], 'E2_NOMFOR' )
 					cData    := AvKey(aLinha[8], 'E2_NUM' )
-					cPrefix  := AvKey("PIX", 'E2_PREFIXO' )
+					cPrefix := AvKey(aLinha[10], 'E2_PREFIXO' )
+					if cPrefix == ""
+						//Se não tiver prefixo, pega o prefixo padrão
+						cPrefix := AvKey("PIX", 'E2_PREFIXO' )
+					EndIf
 					cParcela := AvKey(" ", 'E2_PARCELA' )
 					cTpNF    := AvKey("NF", 'E2_TIPO' )
 
@@ -166,10 +166,10 @@ Static Function fImporta(cArqSel)
 
 						aDados      := {}
 						aadd(aDados, {'E2_FILIAL' , xFilial("SE2")     , Nil})
-						aadd(aDados, {'E2_PREFIXO', "PIX"              , Nil})
+						aadd(aDados, {'E2_PREFIXO', cPrefix            , Nil})
 						aadd(aDados, {'E2_NUM'    , cData              , Nil})
 						aadd(aDados, {'E2_TIPO'   , "NF"               , Nil})
-						aadd(aDados, {'E2_NATUREZ', "PAGFOR"           , Nil})
+						aadd(aDados, {'E2_NATUREZ', "FORN"             , Nil})
 						aadd(aDados, {'E2_FORNECE', cFornec            , Nil})
 						aadd(aDados, {'E2_LOJA'   , cForLoja           , Nil})
 						aadd(aDados, {"E2_NOMFOR" , cNomFor            , Nil})

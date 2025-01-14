@@ -63,7 +63,7 @@ Static Function fImporta(cArqSel)
 	Local aLinha           := {}
 	Local oArquivo
 	Local cLog             := ''
-	Local lIgnor01         := FWAlertYesNo( 'Deseja ignorar a linha 1 do arquivo?' , 'Ignorar?' )
+	//Local lIgnor01         := FWAlertYesNo( 'Deseja ignorar a linha 1 do arquivo?' , 'Ignorar?' )
 	Local cPastaErro       := '\x_logs\'
 	Local cNomeErro        := ''
 	Local cTextoErro       := ''
@@ -126,12 +126,8 @@ Static Function fImporta(cArqSel)
 				cLinAtu := oArquivo:GetLine()
 				aLinha  := Separa(cLinAtu, cSeparador)
 
-				//Se estiver configurado para pular a linha 1, e for a linha 1
-				If lIgnor01 .And. nLinhaAtu == 1
-					Loop
-
-					//Se houver posições no array
-				ElseIf Len(aLinha) > 0
+				//Se houver posições no array
+				If Len(aLinha) > 0
 
 					//Transformando de caractere para numérico (exemplo '1.234,56' para 1234.56)
 					aLinha[3] := StrTran(aLinha[3], '.', '')
@@ -139,24 +135,33 @@ Static Function fImporta(cArqSel)
 					aLinha[3] := Val(aLinha[3])
 
 					//Transformando os campos caractere, adicionando espaços a direita conforme tamanho do campo no dicionário
-					cCGC     := AvKey(aLinha[1], 'A2_CGC' )
+					cCGC := DelUTF8(aLinha[1])
+					cCGC     := AvKey(cCGC, 'A2_CGC' )
 					cNome    := AvKey(aLinha[2], 'A2_NOME' )
 					cNome    := FWNoAccent(cNome)
 					nValor   := aLinha[3]
 					// Remove o traço do CEP, caso exista
 					cCep     := StrTran(aLinha[4], "-", "")
 					cCep     := AvKey(cCep, 'A2_CEP' )
-					cTipo    := AvKey(aLinha[5], 'A2_TIPO' )
+					cTipo    := Alltrim(AvKey(aLinha[5], 'A2_TIPO' ))
 					cTipPIX  := AvKey(aLinha[6], 'F72_TPCHV' )
 					cTipPIX  := '0' + Alltrim(cTipPIX)
-					cChavPix := AvKey(aLinha[7], 'F72_CHVPIX' )
+					if cTipPIX == "01"
+						// Adiciona o prefixo +55 ao valor, assumindo que o valor original está em aLinha[7]
+						cChavPix := "+55" + aLinha[7]
+						cChavPix := AvKey(cChavPix, 'F72_CHVPIX')
+					else
+						cChavPix := AvKey(aLinha[7], 'F72_CHVPIX' )
+					Endif
+
+					Conout(cChavPix)
 
 					// Inicializa valores padrão
 					cEnder  := "RUA X"
 					cBairro := "X"
 					cMuni   := "SANTO ANDRE"
 					cEstado := "SP"
-					cCodMun := "47809"	
+					cCodMun := "47809"
 
 					//Pegando o último código do fornecedor conforme a query
 					BeginSql Alias cAlias
@@ -203,7 +208,7 @@ Static Function fImporta(cArqSel)
 						aadd(aDados, {'A2_EST'    , cEstado           , Nil})
 						aadd(aDados, {'A2_COD_MUN', cCodMun           , Nil})
 						aadd(aDados, {'A2_MUN'    , cMuni             , Nil})
-						aadd(aDados, {'A2_NATUREZ', "PAGFOR"          , Nil})
+						aadd(aDados, {'A2_NATUREZ', "FORN"          , Nil})
 						aadd(aDados, {'A2_PAIS'   , "105"             , Nil})
 						aadd(aDados, {'A2_CODPAIS', "01058"           , Nil})
 						aadd(aDados, {'A2_TPESSOA', "OS"              , Nil})
@@ -281,7 +286,6 @@ Static Function fImporta(cArqSel)
 		FWAlertError('Arquivo não pode ser aberto!', 'Atenção')
 	EndIf
 
-	(SA2)->(DbCloseArea())
 
 Return
 
@@ -335,3 +339,23 @@ User Function F885MVC(cFornec As Character, cForLoja As Character, cTipoCHV As C
 	RestArea(aAreaF72)
 
 Return lOk
+
+
+/*/{Protheus.doc} DelUTF8
+
+	inclusão de chave PIX para fornecedor via execauto (MVC)
+
+	@author      Thalys Augusto
+	@example Exemplos
+	@param   [Nome_do_Parametro],Tipo_do_Parametro,Descricao_do_Parametro
+	@return  Especifica_o_retorno
+	@table   Tabelas
+	@since   08-11-2024
+/*/
+Static Function DelUTF8(cString)
+
+	if Len(cString) >= 3 .AND. Substr(cString,1,3) == Chr(239)+Chr(187)+Chr(191)
+		cString := Substr(cString,4)
+	endif
+
+Return cString
