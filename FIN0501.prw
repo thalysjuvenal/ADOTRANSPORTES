@@ -126,7 +126,8 @@ Static Function fImporta(cArqSel)
 					nValor    := aLinha[3]
 
 					//Transformando os campos caractere, adicionando espaços a direita conforme tamanho do campo no dicionário
-					cCGC     := AvKey(aLinha[1], 'A2_CGC' )
+					cCGC := DelUTF8(aLinha[1])
+					cCGC     := AvKey(cCGC, 'A2_CGC' )
 					cTipoOper := AvKey(aLinha[9], 'E2_XTPOPER')
 					cTipoOper  := '0' + Alltrim(cTipoOper)
 
@@ -232,3 +233,22 @@ Static Function fImporta(cArqSel)
 	EndIf
 
 Return
+
+/*/{Protheus.doc} DelUTF8
+
+	inclusão de chave PIX para fornecedor via execauto (MVC)
+
+	@author      Thalys Augusto
+	@example Exemplos
+	@param   [Nome_do_Parametro],Tipo_do_Parametro,Descricao_do_Parametro
+	@return  Especifica_o_retorno
+	@table   Tabelas
+	@since   08-11-2024
+/*/
+Static Function DelUTF8(cString)
+
+	if Len(cString) >= 3 .AND. Substr(cString,1,3) == Chr(239)+Chr(187)+Chr(191)
+		cString := Substr(cString,4)
+	endif
+
+Return cString
